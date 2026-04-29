@@ -156,7 +156,7 @@ export default function Users() {
       <div className="page-header">
         <div>
           <h1 className="page-title flex items-center gap-2">
-            <Users className="w-5 h-5 text-primary" /> الموظفون والمتطوعون
+            <UsersIcon className="w-5 h-5 text-primary" /> الموظفون والمتطوعون
           </h1>
           <p className="page-subtitle">إدارة حسابات الموظفين والمتطوعين وصلاحياتهم في المؤسسة</p>
         </div>
