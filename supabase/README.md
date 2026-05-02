@@ -131,7 +131,7 @@ WHERE email = 'manager@example.com';
 2. لو `subdomain === 'branch1'` → يستخدم `VITE_BRANCH1_SUPABASE_URL` + `VITE_BRANCH1_SUPABASE_PUBLISHABLE_KEY`.
 3. لو `subdomain === 'branch2'` → يستخدم `VITE_BRANCH2_SUPABASE_URL` + `VITE_BRANCH2_SUPABASE_PUBLISHABLE_KEY`.
 4. أي شيء آخر (مثل `localhost`) → يستخدم `VITE_SUPABASE_URL` الافتراضي.
-5. لكل فرع `storageKey` منفصل في الـ localStorage لمنع تسرب الجلسات بين الفروع.
+5. لكل فرع `storageKey` منفصل في الـ localStorage بصيغة `sb-<project-ref>-auth-token` (نفس الصيغة الافتراضية لمكتبة `supabase-js`) — فيمنع تسرب الجلسات بين الفروع، ويحافظ في نفس الوقت على جلسات الفرع الأصلي بعد ترقية الكود.
 
 ---
 

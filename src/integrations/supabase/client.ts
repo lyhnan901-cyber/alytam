@@ -30,6 +30,19 @@ function readEnv(name: string): string | undefined {
   return env[name];
 }
 
+// نحسب storageKey للفرع الافتراضي بنفس الصيغة الافتراضية لمكتبة supabase-js
+// (sb-<project-ref>-auth-token) للحفاظ على جلسات المستخدمين الحاليين بعد نشر
+// هذا التغيير. مكتبة supabase-js تشتق project ref من أول مقطع في الـ hostname.
+function defaultStorageKey(url: string | undefined): string {
+  if (!url) return "sb-default-auth-token";
+  try {
+    const ref = new URL(url).hostname.split(".")[0];
+    return `sb-${ref}-auth-token`;
+  } catch {
+    return "sb-default-auth-token";
+  }
+}
+
 function getBranchConfig(): BranchConfig {
   // خريطة الفروع: subdomain → أسماء متغيرات البيئة لقاعدة البيانات الخاصة بالفرع.
   // أضِف هنا أي فرع جديد.
@@ -47,7 +60,9 @@ function getBranchConfig(): BranchConfig {
   const fallback: BranchConfig = {
     url: DEFAULT_URL,
     publishableKey: DEFAULT_KEY,
-    storageKey: "sb-auth-default",
+    // نستخدم نفس صيغة supabase-js الافتراضية للفرع الأصلي، لئلا تُلغى
+    // جلسات المستخدمين الحاليين عند نشر هذا التغيير.
+    storageKey: defaultStorageKey(DEFAULT_URL),
   };
 
   if (typeof window === "undefined") {
@@ -67,8 +82,9 @@ function getBranchConfig(): BranchConfig {
       return {
         url,
         publishableKey: key,
-        // مفتاح تخزين منفصل لكل فرع لمنع تسرب الجلسات بين الفروع.
-        storageKey: `sb-auth-${sub}`,
+        // مفتاح تخزين مبني على project-ref الخاص بالفرع — نفس صيغة supabase-js
+        // الافتراضية، فيظل متّسقاً ومنفصلاً تلقائياً عن باقي الفروع.
+        storageKey: defaultStorageKey(url),
       };
     }
     // إذا الـ subdomain يدلّ على فرع لكن متغيراته غير معرّفة في البيئة،
