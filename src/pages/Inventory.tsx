@@ -5,18 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-const ITEMS = [
-  { id: "INV-001", name: "سلال غذائية رمضانية",    category: "غذاء",    qty: 1240, unit: "سلة",    minQty: 200, status: "ok",      location: "مخزن A", lastUpdated: "2026-04-28" },
-  { id: "INV-002", name: "ملابس أطفال (صيفية)",      category: "ملابس",  qty: 380,  unit: "قطعة",   minQty: 100, status: "ok",      location: "مخزن B", lastUpdated: "2026-04-27" },
-  { id: "INV-003", name: "أدوية أساسية (حزمة)",      category: "طبي",    qty: 45,   unit: "حزمة",   minQty: 50,  status: "low",     location: "مخزن A", lastUpdated: "2026-04-26" },
-  { id: "INV-004", name: "حقائب مدرسية",             category: "تعليم",  qty: 620,  unit: "حقيبة",  minQty: 100, status: "ok",      location: "مخزن C", lastUpdated: "2026-04-25" },
-  { id: "INV-005", name: "مراتب ووسائد",             category: "أثاث",   qty: 8,    unit: "طقم",    minQty: 20,  status: "critical", location: "مخزن B", lastUpdated: "2026-04-24" },
-  { id: "INV-006", name: "مواد نظافة شخصية",         category: "نظافة",  qty: 2100, unit: "علبة",   minQty: 500, status: "ok",      location: "مخزن A", lastUpdated: "2026-04-23" },
-  { id: "INV-007", name: "كتب مدرسية (ابتدائي)",     category: "تعليم",  qty: 0,    unit: "كتاب",   minQty: 200, status: "out",     location: "مخزن C", lastUpdated: "2026-04-22" },
-  { id: "INV-008", name: "زيوت ومعلبات غذائية",     category: "غذاء",   qty: 3500, unit: "قطعة",   minQty: 1000, status: "ok",    location: "مخزن A", lastUpdated: "2026-04-28" },
-  { id: "INV-009", name: "أجهزة لوحية للتعليم",      category: "تقنية",  qty: 22,   unit: "جهاز",   minQty: 30,  status: "low",     location: "مخزن D", lastUpdated: "2026-04-21" },
-  { id: "INV-010", name: "مستلزمات طبية (قياس)",     category: "طبي",    qty: 150,  unit: "وحدة",   minQty: 50,  status: "ok",      location: "مخزن A", lastUpdated: "2026-04-20" },
-];
+// قائمة الأصناف: حالياً فارغة. هذي الصفحة لم تُربط بـ Supabase بعد، فتظهر بحالة
+// فارغة لأي فرع. عند ربطها مستقبلاً، استبدل المصفوفة بنتيجة استعلام من قاعدة البيانات.
+const ITEMS: any[] = [];
 
 const STATUS = {
   ok:       { label: "متوفر",    className: "badge-approved", dot: "#22c55e" },

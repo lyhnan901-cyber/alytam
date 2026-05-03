@@ -7,16 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-const MOCK_DONATIONS = [
-  { id: "D-001", donor: "أحمد بن عبدالله المنصور", type: "فرد", amount: 5000, currency: "ر.س", date: "2026-04-28", method: "تحويل بنكي", status: "confirmed", cases: 3, note: "تبرع شهري" },
-  { id: "D-002", donor: "شركة العطاء للتجارة", type: "شركة", amount: 50000, currency: "ر.س", date: "2026-04-27", method: "شيك", status: "confirmed", cases: 20, note: "كفالة جماعية" },
-  { id: "D-003", donor: "محمد علي السعدي", type: "فرد", amount: 1200, currency: "ر.س", date: "2026-04-26", method: "نقد", status: "pending", cases: 1, note: "" },
-  { id: "D-004", donor: "مؤسسة الوفاء الخيرية", type: "مؤسسة", amount: 120000, currency: "ر.س", date: "2026-04-25", method: "تحويل بنكي", status: "confirmed", cases: 48, note: "مشروع تعليمي" },
-  { id: "D-005", donor: "فاطمة حسن العمري", type: "فرد", amount: 800, currency: "ر.س", date: "2026-04-24", method: "نقد", status: "confirmed", cases: 1, note: "" },
-  { id: "D-006", donor: "صندوق الزكاة والصدقات", type: "صندوق", amount: 250000, currency: "ر.س", date: "2026-04-23", method: "تحويل بنكي", status: "confirmed", cases: 100, note: "توزيع موسمي" },
-  { id: "D-007", donor: "عبدالرحمن الغامدي", type: "فرد", amount: 2500, currency: "ر.س", date: "2026-04-22", method: "تطبيق ذكي", status: "pending", cases: 2, note: "كفالة يتيم" },
-  { id: "D-008", donor: "شركة النور للخدمات", type: "شركة", amount: 35000, currency: "ر.س", date: "2026-04-20", method: "شيك", status: "cancelled", cases: 0, note: "تم الإلغاء" },
-];
+// قائمة التبرعات: حالياً فارغة. هذي الصفحة لم تُربط بـ Supabase بعد، فتظهر بحالة
+// فارغة لأي فرع. عند ربطها مستقبلاً، استبدل المصفوفة بنتيجة استعلام من قاعدة البيانات.
+const MOCK_DONATIONS: any[] = [];
 
 const STATUS_MAP: Record<string, { label: string; className: string; icon: any }> = {
   confirmed: { label: "مؤكد", className: "badge-approved", icon: CheckCircle },

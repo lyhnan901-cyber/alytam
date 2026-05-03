@@ -5,16 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-const VOLUNTEERS = [
-  { id: "V-001", name: "عبدالله محمد السالم",   role: "قائد فريق ميداني", dept: "التوزيع الميداني", hours: 142, rating: 5, status: "active",   phone: "0501234567", area: "الرياض - النزهة",   skills: ["قيادة فريق","توزيع مساعدات","إسعاف أولي"], joined: "2024-01" },
-  { id: "V-002", name: "نورة عبدالرحمن الفهد",  role: "متطوعة مكتبية",   dept: "إدارة الحالات",   hours: 98,  rating: 5, status: "active",   phone: "0551234567", area: "الرياض - المرسلات", skills: ["متابعة حالات","إدخال بيانات"],       joined: "2024-03" },
-  { id: "V-003", name: "خالد سعد العتيبي",       role: "متطوع ميداني",    dept: "التوزيع الميداني", hours: 76,  rating: 4, status: "active",   phone: "0531234567", area: "جدة - الروضة",    skills: ["قيادة","توزيع"],                     joined: "2024-06" },
-  { id: "V-004", name: "ريم سلطان الدوسري",     role: "متطوعة إعلامية",  dept: "الإعلام والعلاقات العامة",hours: 54,  rating: 4, status: "active",   phone: "0561234567", area: "الدمام",           skills: ["تصوير","تصميم","سوشيال ميديا"],     joined: "2024-08" },
-  { id: "V-005", name: "فيصل علي الزهراني",     role: "متطوع طبي",       dept: "الرعاية الصحية",  hours: 210, rating: 5, status: "active",   phone: "0571234567", area: "مكة المكرمة",     skills: ["إسعاف أولي","طبيب","رعاية"],        joined: "2023-10" },
-  { id: "V-006", name: "هدى محمد القحطاني",     role: "قائدة فريق",      dept: "إدارة الحالات",   hours: 185, rating: 5, status: "active",   phone: "0541234567", area: "الرياض - اليرموك", skills: ["إدارة","متابعة","تقارير"],          joined: "2023-08" },
-  { id: "V-007", name: "محمد أحمد الحربي",       role: "متطوع ميداني",    dept: "التوزيع الميداني", hours: 32,  rating: 3, status: "inactive", phone: "0591234567", area: "الطائف",           skills: ["توزيع"],                            joined: "2025-01" },
-  { id: "V-008", name: "سارة خالد المطيري",      role: "متطوعة مكتبية",   dept: "الشؤون الإدارية", hours: 67,  rating: 4, status: "active",   phone: "0581234567", area: "الرياض - العليا",  skills: ["سكرتارية","تنظيم فعاليات"],         joined: "2024-05" },
-];
+// قائمة المتطوعين: حالياً فارغة. هذي الصفحة لم تُربط بـ Supabase بعد، فتظهر بحالة
+// فارغة لأي فرع. عند ربطها مستقبلاً، استبدل المصفوفة بنتيجة استعلام من قاعدة البيانات.
+const VOLUNTEERS: any[] = [];
 
 const STATUS = {
   active:   { label: "نشط",   className: "badge-approved" },
@@ -54,6 +47,8 @@ export default function MarketingDashboard() {
 
   const totalHours = VOLUNTEERS.filter(v => v.status === "active").reduce((s, v) => s + v.hours, 0);
   const activeCount = VOLUNTEERS.filter(v => v.status === "active").length;
+  const ratingSum = VOLUNTEERS.filter(v => v.status === "active").reduce((s, v) => s + (v.rating || 0), 0);
+  const avgRating = activeCount > 0 ? (ratingSum / activeCount).toFixed(1) : "—";
 
   return (
     <div className="page-container">
@@ -80,8 +75,8 @@ export default function MarketingDashboard() {
         {[
           { label: "متطوع نشط",       value: activeCount, icon: HandHeart, color: "#a855f7", bg: "rgba(168,85,247,0.1)" },
           { label: "ساعات التطوع",    value: `${totalHours}h`, icon: Clock, color: "#D4A017", bg: "rgba(212,160,23,0.1)" },
-          { label: "متوسط التقييم",   value: "4.4 ⭐", icon: Star, color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-          { label: "فعاليات هذا الشهر", value: 12, icon: Calendar, color: "#166516", bg: "rgba(22,101,22,0.1)" },
+          { label: "متوسط التقييم",   value: avgRating === "—" ? "—" : `${avgRating} ⭐`, icon: Star, color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+          { label: "فعاليات هذا الشهر", value: 0, icon: Calendar, color: "#166516", bg: "rgba(22,101,22,0.1)" },
         ].map(k => (
           <div key={k.label} className="kpi-card">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: k.bg }}>
