@@ -19,6 +19,7 @@ interface Stats {
   inProgressTasks: number;
   completedTasks:  number;
   overdueTasks:    number;
+  totalTasks:      number;
   totalUsers:      number;
   completionRate:  number;
 }
@@ -107,7 +108,7 @@ function Progress({ label, value, max, color }: {
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({
     openRequests: 0, activeCases: 0, inProgressTasks: 0,
-    completedTasks: 0, overdueTasks: 0, totalUsers: 0, completionRate: 0,
+    completedTasks: 0, overdueTasks: 0, totalTasks: 0, totalUsers: 0, completionRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const { profile, role, user } = useAuth();
@@ -161,6 +162,7 @@ export default function Dashboard() {
           inProgressTasks: inProgressTasks || 0,
           completedTasks:  completedTasks  || 0,
           overdueTasks:    overdueTasks    || 0,
+          totalTasks:      totalTasks      || 0,
           totalUsers:      totalUsers      || 0,
           completionRate:  totalTasks
             ? Math.round(((completedTasks || 0) / totalTasks) * 100)
@@ -282,11 +284,15 @@ export default function Dashboard() {
                الرعاية التعليمية / الفعاليات الميدانية ...) لم تكن موجودة في
                قاعدة البيانات وكانت أرقاماً ثابتة في الكود، فاستُبدلت بحالات
                المهام الفعلية. */}
-            <Progress label="قيد التنفيذ" value={stats.inProgressTasks} max={Math.max(stats.inProgressTasks + stats.completedTasks + stats.overdueTasks, 1)} color="#1E90FF" />
-            <Progress label="مكتملة"      value={stats.completedTasks}  max={Math.max(stats.inProgressTasks + stats.completedTasks + stats.overdueTasks, 1)} color="#1a7d1a" />
-            <Progress label="متأخرة"      value={stats.overdueTasks}    max={Math.max(stats.inProgressTasks + stats.completedTasks + stats.overdueTasks, 1)} color="#ef4444" />
-            <Progress label="طلبات فعالة" value={stats.activeCases}     max={Math.max(stats.activeCases + stats.openRequests, 1)} color="#D4A017" />
-            <Progress label="طلبات مفتوحة" value={stats.openRequests}   max={Math.max(stats.activeCases + stats.openRequests, 1)} color="#166516" />
+            {/* المقام = إجمالي المهام، لا جمع الحالات، لأن overdueTasks تتداخل مع
+               inProgressTasks (مهمة InProgress متأخرة تُحسب في الاثنين). */}
+            <Progress label="قيد التنفيذ" value={stats.inProgressTasks} max={Math.max(stats.totalTasks, 1)} color="#1E90FF" />
+            <Progress label="مكتملة"      value={stats.completedTasks}  max={Math.max(stats.totalTasks, 1)} color="#1a7d1a" />
+            <Progress label="متأخرة"      value={stats.overdueTasks}    max={Math.max(stats.totalTasks, 1)} color="#ef4444" />
+            {/* المقام = الطلبات المفتوحة، لأن activeCases (status=InProgress) هو
+               subset من openRequests (status≠Closed). */}
+            <Progress label="طلبات فعالة" value={stats.activeCases}     max={Math.max(stats.openRequests, 1)} color="#D4A017" />
+            <Progress label="طلبات مفتوحة" value={stats.openRequests}   max={Math.max(stats.openRequests, 1)} color="#166516" />
           </div>
         </div>
         <div className="data-card">
