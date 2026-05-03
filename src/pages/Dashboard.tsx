@@ -19,6 +19,7 @@ interface Stats {
   inProgressTasks: number;
   completedTasks:  number;
   overdueTasks:    number;
+  totalTasks:      number;
   totalUsers:      number;
   completionRate:  number;
 }
@@ -107,7 +108,7 @@ function Progress({ label, value, max, color }: {
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({
     openRequests: 0, activeCases: 0, inProgressTasks: 0,
-    completedTasks: 0, overdueTasks: 0, totalUsers: 0, completionRate: 0,
+    completedTasks: 0, overdueTasks: 0, totalTasks: 0, totalUsers: 0, completionRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const { profile, role, user } = useAuth();
@@ -161,6 +162,7 @@ export default function Dashboard() {
           inProgressTasks: inProgressTasks || 0,
           completedTasks:  completedTasks  || 0,
           overdueTasks:    overdueTasks    || 0,
+          totalTasks:      totalTasks      || 0,
           totalUsers:      totalUsers      || 0,
           completionRate:  totalTasks
             ? Math.round(((completedTasks || 0) / totalTasks) * 100)
@@ -238,14 +240,17 @@ export default function Dashboard() {
       </div>
 
       {/* ── 7 KPI Cards ─────────────────────────── */}
+      {/* ملاحظة: نسب التغير (trend/trendVal) كانت قيماً ثابتة في الكود ولا تُمثّل
+         مقارنة زمنية حقيقية، فأُزيلت حتى لا تظهر بيانات مضلّلة. عند ربط مؤشرات
+         تاريخية فعلية لاحقاً، يمكن إعادة إضافتها بقيم محسوبة من قاعدة البيانات. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        <KPI icon={Baby}         title="حالات اليتامى"   value={stats.activeCases}     color="#166516" bg="rgba(22,101,22,0.1)"    trend="up"      trendVal="+12%"  />
-        <KPI icon={Wallet}       title="الطلبات الفعالة" value={stats.openRequests}    color="#D4A017" bg="rgba(212,160,23,0.1)"  trend="up"      trendVal="+8%"   />
-        <KPI icon={CheckSquare}  title="قيد التنفيذ"     value={stats.inProgressTasks} color="#1E90FF" bg="rgba(30,144,255,0.1)"  trend="neutral" trendVal="—"     />
-        <KPI icon={Heart}        title="مكتملة"          value={stats.completedTasks}  color="#1a7d1a" bg="rgba(26,125,26,0.1)"  trend="up"      trendVal="+5%"   />
-        <KPI icon={AlertTriangle}title="متأخرة"          value={stats.overdueTasks}    color="#ef4444" bg="rgba(239,68,68,0.1)"  trend="down"    trendVal="-3%"   />
-        <KPI icon={HandHeart}    title="المتطوعون"       value={450}                   color="#a855f7" bg="rgba(168,85,247,0.1)" trend="up"      trendVal="+25"   />
-        <KPI icon={Target}       title="الإنجاز"         value={`${stats.completionRate}%`} color="#D4A017" bg="rgba(212,160,23,0.1)" trend="up" trendVal="↑"  />
+        <KPI icon={Baby}         title="حالات اليتامى"   value={stats.activeCases}     color="#166516" bg="rgba(22,101,22,0.1)"  />
+        <KPI icon={Wallet}       title="الطلبات الفعالة" value={stats.openRequests}    color="#D4A017" bg="rgba(212,160,23,0.1)" />
+        <KPI icon={CheckSquare}  title="قيد التنفيذ"     value={stats.inProgressTasks} color="#1E90FF" bg="rgba(30,144,255,0.1)" />
+        <KPI icon={Heart}        title="مكتملة"          value={stats.completedTasks}  color="#1a7d1a" bg="rgba(26,125,26,0.1)" />
+        <KPI icon={AlertTriangle}title="متأخرة"          value={stats.overdueTasks}    color="#ef4444" bg="rgba(239,68,68,0.1)" />
+        <KPI icon={HandHeart}    title="المتطوعون"       value={0}                     color="#a855f7" bg="rgba(168,85,247,0.1)" />
+        <KPI icon={Target}       title="الإنجاز"         value={`${stats.completionRate}%`} color="#D4A017" bg="rgba(212,160,23,0.1)" />
       </div>
 
       {/* ── Quick Actions ────────────────────────── */}
@@ -272,14 +277,22 @@ export default function Dashboard() {
         <TodayTasks />
         <div className="data-card">
           <div className="data-card-header">
-            <h2 className="data-card-title">📊 توزيع المهام</h2>
+            <h2 className="data-card-title">📊 توزيع المهام حسب الحالة</h2>
           </div>
           <div className="data-card-body space-y-4">
-            <Progress label="توزيع المساعدات"   value={2450} max={6000} color="#166516" />
-            <Progress label="حالات اليتامى"     value={1280} max={6000} color="#D4A017" />
-            <Progress label="متابعة التبرعات"   value={950}  max={6000} color="#1E90FF" />
-            <Progress label="الرعاية التعليمية" value={380}  max={6000} color="#a855f7" />
-            <Progress label="الفعاليات الميدانية" value={320} max={6000} color="#f97316" />
+            {/* محسوب من جدول tasks. الفئات الديكورية القديمة (توزيع المساعدات /
+               الرعاية التعليمية / الفعاليات الميدانية ...) لم تكن موجودة في
+               قاعدة البيانات وكانت أرقاماً ثابتة في الكود، فاستُبدلت بحالات
+               المهام الفعلية. */}
+            {/* المقام = إجمالي المهام، لا جمع الحالات، لأن overdueTasks تتداخل مع
+               inProgressTasks (مهمة InProgress متأخرة تُحسب في الاثنين). */}
+            <Progress label="قيد التنفيذ" value={stats.inProgressTasks} max={Math.max(stats.totalTasks, 1)} color="#1E90FF" />
+            <Progress label="مكتملة"      value={stats.completedTasks}  max={Math.max(stats.totalTasks, 1)} color="#1a7d1a" />
+            <Progress label="متأخرة"      value={stats.overdueTasks}    max={Math.max(stats.totalTasks, 1)} color="#ef4444" />
+            {/* المقام = الطلبات المفتوحة، لأن activeCases (status=InProgress) هو
+               subset من openRequests (status≠Closed). */}
+            <Progress label="طلبات فعالة" value={stats.activeCases}     max={Math.max(stats.openRequests, 1)} color="#D4A017" />
+            <Progress label="طلبات مفتوحة" value={stats.openRequests}   max={Math.max(stats.openRequests, 1)} color="#166516" />
           </div>
         </div>
         <div className="data-card">
@@ -287,11 +300,13 @@ export default function Dashboard() {
             <h2 className="data-card-title">🎯 مؤشرات الأداء</h2>
           </div>
           <div className="data-card-body space-y-4">
+            {/* المؤشرات الثلاثة الأخيرة (رضا المتبرعين / تحسن الحالات / المتطوعون
+               النشطون) كانت قيماً ثابتة في الكود ولا يوجد لها مصدر بيانات في
+               القاعدة، فأُزيلت. يبقى مؤشر إنجاز المهام لأنه محسوب فعلياً. عند
+               توفر استبيانات أو مؤشرات حقيقية لاحقاً، أضِفها هنا بقيمها
+               الفعلية. */}
             {[
-              { label: "نسبة إنجاز المهام",    value: stats.completionRate, target: 97,  color: "#1a7d1a" },
-              { label: "رضا المتبرعين",         value: 89,                  target: 92,  color: "#D4A017" },
-              { label: "تحسن الحالات",          value: 82,                  target: 85,  color: "#1E90FF" },
-              { label: "المتطوعون النشطون",     value: 90,                  target: 100, color: "#a855f7" },
+              { label: "نسبة إنجاز المهام", value: stats.completionRate, target: 100, color: "#1a7d1a" },
             ].map(({ label, value, target, color }) => (
               <div key={label}>
                 <div className="flex items-center justify-between text-xs mb-1.5">
@@ -320,13 +335,11 @@ export default function Dashboard() {
             <Calendar className="w-4 h-4 text-muted-foreground" />
           </div>
           <div className="data-card-body space-y-3">
-            {[
-              { time: "09:00", title: "توزيع مساعدات - حي النزهة",      type: "urgent",    icon: Package },
-              { time: "10:30", title: "متابعة حالة يتيم رقم #1082",      type: "case",      icon: Baby },
-              { time: "13:00", title: "اجتماع فريق التطوع",              type: "volunteer", icon: HandHeart },
-              { time: "15:00", title: "مراجعة تبرعات الشركاء",           type: "donation",  icon: Wallet },
-              { time: "16:30", title: "تقرير نهاية اليوم",               type: "report",    icon: Activity },
-            ].map(({ time, title, type, icon: I }) => (
+            {/* قائمة المواعيد فاضية: لا يوجد جدول مواعيد/تقويم في قاعدة البيانات
+               حالياً، والمواعيد القديمة كانت ثابتة في الكود. يُعرض الـ empty
+               state أدناه. عند إضافة جدول calendar/appointments لاحقاً، عبّئ
+               هذا المصفوف من استعلام Supabase. */}
+            {([] as Array<{ time: string; title: string; type: string; icon: any }>).map(({ time, title, type, icon: I }) => (
               <div key={time} className="flex items-start gap-3">
                 <div className="mt-0.5 w-14 text-center px-2 py-1 rounded-lg shrink-0"
                   style={{ background: "rgba(22,101,22,0.06)" }}>
@@ -343,6 +356,9 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              لا توجد مواعيد لعرضها
+            </div>
           </div>
         </div>
       </div>
