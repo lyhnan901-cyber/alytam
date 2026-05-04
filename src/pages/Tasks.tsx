@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { getBranchFlags } from "@/lib/branch-flags";
 import { TaskForm } from "@/components/forms/TaskForm";
 import { TaskAssignmentForm } from "@/components/forms/TaskAssignmentForm";
 import { TaskStatusForm } from "@/components/forms/TaskStatusForm";
@@ -111,8 +112,13 @@ export default function Tasks() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const { fourTierWorkflow } = getBranchFlags();
   const canCreate = isGeneralManager || role === "ExecutiveManager";
-  const canAssignDepartment = isGeneralManager || role === "Supervisor";
+  // في سلسلة الأربع طبقات يتولّى المدير التنفيذي تعيين المهمة للقسم بدل المشرف.
+  const canAssignDepartment =
+    isGeneralManager ||
+    role === "Supervisor" ||
+    (fourTierWorkflow && role === "ExecutiveManager");
   const canAssignEmployee = isGeneralManager || role === "DepartmentHead";
 
   const fetchData = async () => {
@@ -422,6 +428,18 @@ export default function Tasks() {
                             تعيين للقسم
                           </DropdownMenuItem>
                         )}
+                        {fourTierWorkflow &&
+                          canAssignDepartment &&
+                          task.level === "Executive" &&
+                          task.status === "New" && (
+                            <DropdownMenuItem
+                              className="gap-2"
+                              onClick={() => handleAssign(task, "department")}
+                            >
+                              <Building2 className="w-4 h-4" />
+                              تعيين للقسم
+                            </DropdownMenuItem>
+                          )}
                         {canAssignEmployee && task.level === "DeptHead" && task.status === "NotStarted" && (
                           <DropdownMenuItem
                             className="gap-2"

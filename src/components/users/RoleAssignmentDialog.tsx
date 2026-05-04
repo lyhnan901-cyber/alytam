@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { getBranchFlags } from "@/lib/branch-flags";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -34,7 +35,7 @@ interface RoleAssignmentDialogProps {
   } | null;
 }
 
-const roleOptions: { value: AppRole; label: string }[] = [
+const ALL_ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "GeneralManager", label: "المدير العام" },
   { value: "CustomerService", label: "خدمة المستفيدين" },
   { value: "ExecutiveManager", label: "المدير التنفيذي" },
@@ -42,6 +43,13 @@ const roleOptions: { value: AppRole; label: string }[] = [
   { value: "DepartmentHead", label: "رئيس القسم" },
   { value: "Employee", label: "موظف" },
 ];
+
+function getRoleOptions(): { value: AppRole; label: string }[] {
+  const { fourTierWorkflow } = getBranchFlags();
+  return fourTierWorkflow
+    ? ALL_ROLE_OPTIONS.filter((opt) => opt.value !== "Supervisor")
+    : ALL_ROLE_OPTIONS;
+}
 
 export function RoleAssignmentDialog({
   open,
@@ -52,6 +60,7 @@ export function RoleAssignmentDialog({
   const [selectedRole, setSelectedRole] = useState<AppRole | "">("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const roleOptions = getRoleOptions();
 
   const handleSubmit = async () => {
     if (!user || !selectedRole) return;

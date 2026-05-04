@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { notifyTaskAssigned, notifyStatusChanged, notifyApprovalRequired } from "./notifications";
 import { runAutomations, type TaskData } from "./automation";
 import { logTaskCreated, logTaskStatusChanged, logTaskAssigned, logTaskApproved, logTaskRejected, logTaskCompleted } from "./activity-logger";
+import { getBranchFlags } from "./branch-flags";
 
 type TaskStatus = "New" | "NotStarted" | "InProgress" | "Completed" | "PendingDeptHeadReview" | "PendingSupervisorReview" | "PendingExecutiveReview" | "PendingGMApproval" | "Approved" | "NeedRevision" | "Rejected";
 type TaskLevel = "Executive" | "Supervisor" | "DeptHead" | "Employee";
@@ -463,12 +464,23 @@ export async function approveTask(taskId: string, userId: string, notes?: string
   let newStatus: TaskStatus;
   let newLevel: TaskLevel | undefined;
 
+  // في فروع تستخدم سلسلة الأربع طبقات يُتجاوَز اعتماد المشرف؛ يصعد الاعتماد
+  // مباشرة من رئيس القسم إلى المدير التنفيذي.
+  const { fourTierWorkflow } = getBranchFlags();
+
   switch (task.status) {
     case "PendingDeptHeadReview":
-      newStatus = "PendingSupervisorReview";
-      newLevel = "Supervisor";
+      if (fourTierWorkflow) {
+        newStatus = "PendingExecutiveReview";
+        newLevel = "Executive";
+      } else {
+        newStatus = "PendingSupervisorReview";
+        newLevel = "Supervisor";
+      }
       break;
     case "PendingSupervisorReview":
+      // يبقى هذا المسار للتوافق مع المهام القديمة على الفروع التقليدية،
+      // ولأي مهمة عالقة في PendingSupervisorReview قبل تفعيل سلسلة الأربع طبقات.
       newStatus = "PendingExecutiveReview";
       newLevel = "Executive";
       break;

@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getBranchFlags } from "@/lib/branch-flags";
 
 interface Permission {
   key: string;
@@ -140,8 +141,15 @@ export default function Roles() {
         roleCounts[ur.role] = (roleCounts[ur.role] || 0) + 1;
       });
 
+      // حدد أي أدوار تُعرض في واجهة الصلاحيات. في فروع سلسلة الأربع طبقات يُخفى
+      // دور Supervisor بالكامل لأنه غير مستخدم في سلسلة المهام.
+      const { fourTierWorkflow } = getBranchFlags();
+      const roleEntries = Object.entries(roleDefinitions).filter(
+        ([key]) => !(fourTierWorkflow && key === "Supervisor")
+      );
+
       // Build roles array with counts
-      const rolesWithCounts: RoleData[] = Object.entries(roleDefinitions).map(
+      const rolesWithCounts: RoleData[] = roleEntries.map(
         ([key, def]) => ({
           ...def,
           usersCount: roleCounts[key] || 0,

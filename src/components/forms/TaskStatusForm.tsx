@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { updateTaskStatus, approveTask, rejectTask } from "@/lib/workflow";
+import { getBranchFlags } from "@/lib/branch-flags";
 
 const statusFormSchema = z.object({
   status: z.string().min(1, "يجب اختيار الحالة"),
@@ -67,6 +68,7 @@ export function TaskStatusForm({
   });
 
   const isGeneralManager = role === "GeneralManager";
+  const { fourTierWorkflow } = getBranchFlags();
 
   // Determine available status options based on role and current status
   const getStatusOptions = () => {
@@ -88,15 +90,21 @@ export function TaskStatusForm({
     // Executive Manager actions
     if (role === "ExecutiveManager" || isGeneralManager) {
       if (currentStatus === "New" && currentLevel === "Executive") {
-        options.push({ value: "SendToSupervisor", label: "إرسال للمشرف" });
+        if (fourTierWorkflow) {
+          // في سلسلة الأربع طبقات تتجاوز المهمة طبقة المشرف وتذهب لرئيس القسم مباشرة.
+          // التعيين الفعلي (اختيار القسم + رئيسه) يتم عبر زر "تعيين للقسم" في قائمة المهمة.
+          options.push({ value: "AssignToDepartment", label: "تعيين لقسم" });
+        } else {
+          options.push({ value: "SendToSupervisor", label: "إرسال للمشرف" });
+        }
       }
       if (currentStatus === "PendingExecutiveReview") {
         options.push({ value: "Approve", label: "اعتماد" });
       }
     }
 
-    // Supervisor actions
-    if (role === "Supervisor" || isGeneralManager) {
+    // Supervisor actions — مخفية تماماً في سلسلة الأربع طبقات.
+    if (!fourTierWorkflow && (role === "Supervisor" || isGeneralManager)) {
       if (currentStatus === "NotStarted" && currentLevel === "Supervisor") {
         options.push({ value: "AssignToDepartment", label: "تعيين لقسم" });
       }
