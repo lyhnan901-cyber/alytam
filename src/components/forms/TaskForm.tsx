@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -30,13 +31,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
-const taskSchema = z.object({
-  title: z.string().min(2, "عنوان المهمة مطلوب").max(200),
-  description: z.string().max(1000).optional(),
-  priority: z.enum(["High", "Medium", "Low"]),
-  due_date: z.string().optional(),
-  notes: z.string().max(1000).optional(),
-});
+const taskSchema = z
+  .object({
+    title: z.string().min(2, "عنوان المهمة مطلوب").max(200),
+    description: z.string().max(1000).optional(),
+    priority: z.enum(["High", "Medium", "Low"]),
+    due_date: z.string().optional(),
+    notes: z.string().max(1000).optional(),
+    direct_assign: z.boolean().optional(),
+    department_id: z.string().optional(),
+    assignee_id: z.string().optional(),
+  })
+  .refine(
+    (v) => !v.direct_assign || (v.department_id && v.assignee_id),
+    {
+      message: "يجب اختيار القسم والشخص المعيَّن عند تفعيل التعيين المباشر",
+      path: ["assignee_id"],
+    }
+  );
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
@@ -61,9 +73,21 @@ const priorities = [
   { value: "Low", label: "منخفض" },
 ];
 
+interface DepartmentOption {
+  id: string;
+  name: string;
+}
+
+interface AssigneeOption {
+  id: string;
+  full_name: string;
+}
+
 export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskFormProps) {
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const { user, isGeneralManager } = useAuth();
   const { toast } = useToast();
   const isEditing = !!task;
 
@@ -75,8 +99,50 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
       priority: (task?.priority as "High" | "Medium" | "Low") || "Medium",
       due_date: task?.due_date || "",
       notes: task?.notes || "",
+      direct_assign: false,
+      department_id: undefined,
+      assignee_id: undefined,
     },
   });
+
+  const directAssign = form.watch("direct_assign");
+  const selectedDept = form.watch("department_id");
+
+  // Load departments when GM toggles direct-assign on a new task
+  useEffect(() => {
+    if (!isGeneralManager || isEditing || !directAssign) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("departments")
+        .select("id, name")
+        .order("name");
+      if (!cancelled && data) setDepartments(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGeneralManager, isEditing, directAssign]);
+
+  // Load assignees when a department is picked
+  useEffect(() => {
+    if (!directAssign || !selectedDept) {
+      setAssignees([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("department_id", selectedDept)
+        .order("full_name");
+      if (!cancelled && data) setAssignees(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [directAssign, selectedDept]);
 
   useEffect(() => {
     if (task) {
@@ -111,6 +177,40 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
 
         toast({
           title: "تم تحديث المهمة بنجاح",
+        });
+      } else if (values.direct_assign && isGeneralManager && values.assignee_id) {
+        // GM-only: create task already assigned directly to a chosen user.
+        // Look up that user's role to pick the correct task level so the
+        // approval chain still works after completion.
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", values.assignee_id)
+          .maybeSingle();
+        const r = roleRow?.role;
+        let level: "Executive" | "Supervisor" | "DeptHead" | "Employee" = "Employee";
+        if (r === "Supervisor") level = "Supervisor";
+        else if (r === "DepartmentHead") level = "DeptHead";
+        else if (r === "ExecutiveManager") level = "Executive";
+
+        const { error } = await supabase.from("tasks").insert({
+          request_id: requestId,
+          title: values.title,
+          description: values.description,
+          priority: values.priority,
+          due_date: values.due_date || null,
+          notes: values.notes,
+          level,
+          status: "NotStarted",
+          department_id: values.department_id,
+          assignee_id: values.assignee_id,
+          assigned_by: user.id,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "تم إنشاء المهمة وتعيينها مباشرة بنجاح",
         });
       } else {
         const { error } = await supabase.from("tasks").insert({
@@ -249,6 +349,97 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
                 </FormItem>
               )}
             />
+
+            {isGeneralManager && !isEditing && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+                <FormField
+                  control={form.control}
+                  name="direct_assign"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value || false}
+                          onCheckedChange={(checked) => {
+                            field.onChange(!!checked);
+                            if (!checked) {
+                              form.setValue("department_id", undefined);
+                              form.setValue("assignee_id", undefined);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="!mt-0 cursor-pointer">
+                        تعيين مباشر للكادر (تخطّي التسلسل الهرمي)
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                {directAssign && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="department_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>القسم</FormLabel>
+                          <Select
+                            onValueChange={(v) => {
+                              field.onChange(v);
+                              form.setValue("assignee_id", undefined);
+                            }}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="اختر القسم" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {departments.map((d) => (
+                                <SelectItem key={d.id} value={d.id}>
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="assignee_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>الشخص المعيَّن</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={!selectedDept}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="اختر الشخص" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {assignees.map((u) => (
+                                <SelectItem key={u.id} value={u.id}>
+                                  {u.full_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button

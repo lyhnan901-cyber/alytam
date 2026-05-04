@@ -320,6 +320,39 @@ export async function assignTaskToEmployee(
   );
 }
 
+// GeneralManager-only: directly assign a task to any user, bypassing the
+// Executive → Supervisor → DeptHead → Employee chain. Sets the task level to
+// match the picked assignee's role so subsequent transitions work correctly.
+export async function directAssignTask(
+  taskId: string,
+  assigneeId: string,
+  departmentId: string | null,
+  userId: string,
+  notes?: string
+) {
+  const { data: roleRow } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", assigneeId)
+    .maybeSingle();
+
+  const role = roleRow?.role;
+  let level: TaskLevel = "Employee";
+  if (role === "Supervisor") level = "Supervisor";
+  else if (role === "DepartmentHead") level = "DeptHead";
+  else if (role === "ExecutiveManager") level = "Executive";
+
+  return updateTaskStatus(
+    taskId,
+    "NotStarted",
+    userId,
+    notes,
+    level,
+    assigneeId,
+    departmentId || undefined
+  );
+}
+
 // Department Head approves task
 export async function approveTask(taskId: string, userId: string, notes?: string) {
   // Get task to determine current level
