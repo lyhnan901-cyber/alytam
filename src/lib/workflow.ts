@@ -320,6 +320,135 @@ export async function assignTaskToEmployee(
   );
 }
 
+// Roles that participate in the task-execution chain. GeneralManager and
+// CustomerService are intentionally excluded — they cannot receive a direct
+// task assignment because there is no TaskLevel that fits them.
+export const directAssignableRoles = [
+  "ExecutiveManager",
+  "Supervisor",
+  "DepartmentHead",
+  "Employee",
+] as const;
+
+export type DirectAssignableRole = (typeof directAssignableRoles)[number];
+
+// Maps an assignee's role to the corresponding TaskLevel. Returns null if the
+// role is not part of the execution chain (GeneralManager / CustomerService).
+export function roleToTaskLevel(role: string | null | undefined): TaskLevel | null {
+  switch (role) {
+    case "ExecutiveManager":
+      return "Executive";
+    case "Supervisor":
+      return "Supervisor";
+    case "DepartmentHead":
+      return "DeptHead";
+    case "Employee":
+      return "Employee";
+    default:
+      return null;
+  }
+}
+
+async function getAssigneeLevelOrThrow(assigneeId: string): Promise<TaskLevel> {
+  const { data: roleRow } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", assigneeId)
+    .maybeSingle();
+  const level = roleToTaskLevel(roleRow?.role);
+  if (!level) {
+    throw new Error(
+      "لا يمكن التعيين المباشر لهذا المستخدم بسبب دوره. اختر شخصاً من السلسلة التنفيذية."
+    );
+  }
+  return level;
+}
+
+// GeneralManager-only: directly assign an EXISTING task to any user in the
+// execution chain, bypassing Executive → Supervisor → DeptHead → Employee.
+// Reuses updateTaskStatus so history, notifications, and automations all fire.
+export async function directAssignTask(
+  taskId: string,
+  assigneeId: string,
+  departmentId: string | null,
+  userId: string,
+  notes?: string
+) {
+  const level = await getAssigneeLevelOrThrow(assigneeId);
+  return updateTaskStatus(
+    taskId,
+    "NotStarted",
+    userId,
+    notes,
+    level,
+    assigneeId,
+    departmentId || undefined
+  );
+}
+
+// GeneralManager-only: create a NEW task that is already assigned directly,
+// skipping the workflow chain. Mirrors createInitialTask: notifies the
+// assignee, logs the activity, and runs task_created automations.
+export async function createDirectAssignedTask(params: {
+  requestId: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string | null;
+  notes?: string;
+  departmentId: string;
+  assigneeId: string;
+  createdBy: string;
+}) {
+  const level = await getAssigneeLevelOrThrow(params.assigneeId);
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      request_id: params.requestId,
+      title: params.title,
+      description: params.description ?? null,
+      priority: params.priority,
+      due_date: params.dueDate ?? null,
+      notes: params.notes ?? null,
+      level,
+      status: "NotStarted" as TaskStatus,
+      department_id: params.departmentId,
+      assignee_id: params.assigneeId,
+      assigned_by: params.createdBy,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (data) {
+    await notifyTaskAssigned(params.assigneeId, params.title, data.id);
+    await logTaskCreated(params.createdBy, data.id, params.title, data.level);
+    await logTaskAssigned(
+      params.createdBy,
+      data.id,
+      params.title,
+      params.assigneeId,
+      data.level
+    );
+
+    const taskData: TaskData = {
+      id: data.id,
+      title: data.title,
+      status: data.status,
+      priority: data.priority,
+      level: data.level,
+      department_id: data.department_id,
+      assignee_id: data.assignee_id,
+      request_id: data.request_id,
+    };
+    await runAutomations("task_created", taskData, params.createdBy);
+  }
+
+  return data;
+}
+
 // Department Head approves task
 export async function approveTask(taskId: string, userId: string, notes?: string) {
   // Get task to determine current level

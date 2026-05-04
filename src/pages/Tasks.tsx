@@ -106,7 +106,7 @@ export default function Tasks() {
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [assignmentType, setAssignmentType] = useState<"department" | "employee">("department");
+  const [assignmentType, setAssignmentType] = useState<"department" | "employee" | "direct">("department");
   const { role, isGeneralManager } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -197,7 +197,7 @@ export default function Tasks() {
     }).format(new Date(date));
   };
 
-  const handleAssign = (task: Task, type: "department" | "employee") => {
+  const handleAssign = (task: Task, type: "department" | "employee" | "direct") => {
     setSelectedTask(task);
     setAssignmentType(type);
     setShowAssignForm(true);
@@ -429,6 +429,15 @@ export default function Tasks() {
                           >
                             <User className="w-4 h-4" />
                             تعيين للموظف
+                          </DropdownMenuItem>
+                        )}
+                        {isGeneralManager && (
+                          <DropdownMenuItem
+                            className="gap-2"
+                            onClick={() => handleAssign(task, "direct")}
+                          >
+                            <User className="w-4 h-4" />
+                            تعيين مباشر (GM)
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>

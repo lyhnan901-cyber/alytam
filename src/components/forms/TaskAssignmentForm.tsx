@@ -28,7 +28,12 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { assignTaskToDepartment, assignTaskToEmployee } from "@/lib/workflow";
+import {
+  assignTaskToDepartment,
+  assignTaskToEmployee,
+  directAssignTask,
+  directAssignableRoles,
+} from "@/lib/workflow";
 
 const assignmentSchema = z.object({
   department_id: z.string().optional(),
@@ -43,7 +48,7 @@ interface TaskAssignmentFormProps {
   onClose: () => void;
   onSuccess: () => void;
   taskId: string;
-  assignmentType: "department" | "employee";
+  assignmentType: "department" | "employee" | "direct";
   currentDepartmentId?: string;
 }
 
@@ -90,7 +95,7 @@ export function TaskAssignmentForm({
       const { data } = await supabase.from("departments").select("id, name");
       if (data) setDepartments(data);
     };
-    if (assignmentType === "department") {
+    if (assignmentType === "department" || assignmentType === "direct") {
       fetchDepartments();
     }
   }, [assignmentType]);
@@ -121,6 +126,26 @@ export function TaskAssignmentForm({
             .in("id", userIds);
           if (profiles) setUsers(profiles);
         }
+      } else if (assignmentType === "direct" && selectedDepartment) {
+        // Direct assign (GM only): fetch users in the picked department,
+        // restricted to roles that map to a TaskLevel (Executive / Supervisor
+        // / DeptHead / Employee). GeneralManager and CustomerService are
+        // excluded because they have no matching task level.
+        const { data: roleRows } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .in("role", directAssignableRoles as unknown as string[]);
+        const allowedIds = (roleRows ?? []).map((r) => r.user_id);
+        if (allowedIds.length === 0) {
+          setUsers([]);
+          return;
+        }
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .eq("department_id", selectedDepartment)
+          .in("id", allowedIds);
+        if (data) setUsers(data);
       }
     };
 
@@ -141,6 +166,17 @@ export function TaskAssignmentForm({
         );
         toast({
           title: "تم تعيين المهمة للقسم بنجاح",
+        });
+      } else if (assignmentType === "direct") {
+        await directAssignTask(
+          taskId,
+          values.assignee_id,
+          values.department_id || null,
+          user.id,
+          values.notes
+        );
+        toast({
+          title: "تم تعيين المهمة مباشرة بنجاح",
         });
       } else {
         await assignTaskToEmployee(taskId, values.assignee_id, user.id);
@@ -168,13 +204,17 @@ export function TaskAssignmentForm({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {assignmentType === "department" ? "تعيين للقسم" : "تعيين لكادر"}
+            {assignmentType === "department"
+              ? "تعيين للقسم"
+              : assignmentType === "direct"
+              ? "تعيين مباشر"
+              : "تعيين لكادر"}
           </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {assignmentType === "department" && (
+            {(assignmentType === "department" || assignmentType === "direct") && (
               <FormField
                 control={form.control}
                 name="department_id"
@@ -214,7 +254,11 @@ export function TaskAssignmentForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    {assignmentType === "department" ? "رئيس القسم" : "الكادر المعيَّن"}
+                    {assignmentType === "department"
+                      ? "رئيس القسم"
+                      : assignmentType === "direct"
+                      ? "الشخص المعيَّن إليه (أي دور)"
+                      : "الكادر المعيَّن"}
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
@@ -223,6 +267,8 @@ export function TaskAssignmentForm({
                           placeholder={
                             assignmentType === "department"
                               ? "اختر رئيس القسم"
+                              : assignmentType === "direct"
+                              ? "اختر الشخص"
                               : "اختر الموظف"
                           }
                         />
