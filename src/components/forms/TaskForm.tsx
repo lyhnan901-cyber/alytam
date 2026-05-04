@@ -30,6 +30,10 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import {
+  createDirectAssignedTask,
+  directAssignableRoles,
+} from "@/lib/workflow";
 
 const taskSchema = z
   .object({
@@ -124,7 +128,10 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
     };
   }, [isGeneralManager, isEditing, directAssign]);
 
-  // Load assignees when a department is picked
+  // Load assignees when a department is picked. Only users whose role is in
+  // the execution chain (Executive/Supervisor/DeptHead/Employee) are listed —
+  // GeneralManager and CustomerService cannot receive a direct task because
+  // they have no matching task level.
   useEffect(() => {
     if (!directAssign || !selectedDept) {
       setAssignees([]);
@@ -132,10 +139,20 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
     }
     let cancelled = false;
     (async () => {
+      const { data: roleRows } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .in("role", directAssignableRoles as unknown as string[]);
+      const allowedIds = (roleRows ?? []).map((r) => r.user_id);
+      if (allowedIds.length === 0) {
+        if (!cancelled) setAssignees([]);
+        return;
+      }
       const { data } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("department_id", selectedDept)
+        .in("id", allowedIds)
         .order("full_name");
       if (!cancelled && data) setAssignees(data);
     })();
@@ -178,36 +195,26 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
         toast({
           title: "تم تحديث المهمة بنجاح",
         });
-      } else if (values.direct_assign && isGeneralManager && values.assignee_id) {
+      } else if (
+        values.direct_assign &&
+        isGeneralManager &&
+        values.assignee_id &&
+        values.department_id
+      ) {
         // GM-only: create task already assigned directly to a chosen user.
-        // Look up that user's role to pick the correct task level so the
-        // approval chain still works after completion.
-        const { data: roleRow } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", values.assignee_id)
-          .maybeSingle();
-        const r = roleRow?.role;
-        let level: "Executive" | "Supervisor" | "DeptHead" | "Employee" = "Employee";
-        if (r === "Supervisor") level = "Supervisor";
-        else if (r === "DepartmentHead") level = "DeptHead";
-        else if (r === "ExecutiveManager") level = "Executive";
-
-        const { error } = await supabase.from("tasks").insert({
-          request_id: requestId,
+        // Delegated to createDirectAssignedTask so notifications, activity
+        // logging, and automations all fire (mirrors createInitialTask).
+        await createDirectAssignedTask({
+          requestId,
           title: values.title,
           description: values.description,
           priority: values.priority,
-          due_date: values.due_date || null,
+          dueDate: values.due_date || null,
           notes: values.notes,
-          level,
-          status: "NotStarted",
-          department_id: values.department_id,
-          assignee_id: values.assignee_id,
-          assigned_by: user.id,
+          departmentId: values.department_id,
+          assigneeId: values.assignee_id,
+          createdBy: user.id,
         });
-
-        if (error) throw error;
 
         toast({
           title: "تم إنشاء المهمة وتعيينها مباشرة بنجاح",

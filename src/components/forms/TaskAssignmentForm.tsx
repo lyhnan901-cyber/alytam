@@ -28,7 +28,12 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { assignTaskToDepartment, assignTaskToEmployee, directAssignTask } from "@/lib/workflow";
+import {
+  assignTaskToDepartment,
+  assignTaskToEmployee,
+  directAssignTask,
+  directAssignableRoles,
+} from "@/lib/workflow";
 
 const assignmentSchema = z.object({
   department_id: z.string().optional(),
@@ -122,12 +127,24 @@ export function TaskAssignmentForm({
           if (profiles) setUsers(profiles);
         }
       } else if (assignmentType === "direct" && selectedDepartment) {
-        // Direct assign (GM only): fetch ALL users in the picked department
-        // regardless of role.
+        // Direct assign (GM only): fetch users in the picked department,
+        // restricted to roles that map to a TaskLevel (Executive / Supervisor
+        // / DeptHead / Employee). GeneralManager and CustomerService are
+        // excluded because they have no matching task level.
+        const { data: roleRows } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .in("role", directAssignableRoles as unknown as string[]);
+        const allowedIds = (roleRows ?? []).map((r) => r.user_id);
+        if (allowedIds.length === 0) {
+          setUsers([]);
+          return;
+        }
         const { data } = await supabase
           .from("profiles")
           .select("id, full_name, email")
-          .eq("department_id", selectedDepartment);
+          .eq("department_id", selectedDepartment)
+          .in("id", allowedIds);
         if (data) setUsers(data);
       }
     };

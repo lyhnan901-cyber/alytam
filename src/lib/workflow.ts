@@ -320,9 +320,53 @@ export async function assignTaskToEmployee(
   );
 }
 
-// GeneralManager-only: directly assign a task to any user, bypassing the
-// Executive → Supervisor → DeptHead → Employee chain. Sets the task level to
-// match the picked assignee's role so subsequent transitions work correctly.
+// Roles that participate in the task-execution chain. GeneralManager and
+// CustomerService are intentionally excluded — they cannot receive a direct
+// task assignment because there is no TaskLevel that fits them.
+export const directAssignableRoles = [
+  "ExecutiveManager",
+  "Supervisor",
+  "DepartmentHead",
+  "Employee",
+] as const;
+
+export type DirectAssignableRole = (typeof directAssignableRoles)[number];
+
+// Maps an assignee's role to the corresponding TaskLevel. Returns null if the
+// role is not part of the execution chain (GeneralManager / CustomerService).
+export function roleToTaskLevel(role: string | null | undefined): TaskLevel | null {
+  switch (role) {
+    case "ExecutiveManager":
+      return "Executive";
+    case "Supervisor":
+      return "Supervisor";
+    case "DepartmentHead":
+      return "DeptHead";
+    case "Employee":
+      return "Employee";
+    default:
+      return null;
+  }
+}
+
+async function getAssigneeLevelOrThrow(assigneeId: string): Promise<TaskLevel> {
+  const { data: roleRow } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", assigneeId)
+    .maybeSingle();
+  const level = roleToTaskLevel(roleRow?.role);
+  if (!level) {
+    throw new Error(
+      "لا يمكن التعيين المباشر لهذا المستخدم بسبب دوره. اختر شخصاً من السلسلة التنفيذية."
+    );
+  }
+  return level;
+}
+
+// GeneralManager-only: directly assign an EXISTING task to any user in the
+// execution chain, bypassing Executive → Supervisor → DeptHead → Employee.
+// Reuses updateTaskStatus so history, notifications, and automations all fire.
 export async function directAssignTask(
   taskId: string,
   assigneeId: string,
@@ -330,18 +374,7 @@ export async function directAssignTask(
   userId: string,
   notes?: string
 ) {
-  const { data: roleRow } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", assigneeId)
-    .maybeSingle();
-
-  const role = roleRow?.role;
-  let level: TaskLevel = "Employee";
-  if (role === "Supervisor") level = "Supervisor";
-  else if (role === "DepartmentHead") level = "DeptHead";
-  else if (role === "ExecutiveManager") level = "Executive";
-
+  const level = await getAssigneeLevelOrThrow(assigneeId);
   return updateTaskStatus(
     taskId,
     "NotStarted",
@@ -351,6 +384,69 @@ export async function directAssignTask(
     assigneeId,
     departmentId || undefined
   );
+}
+
+// GeneralManager-only: create a NEW task that is already assigned directly,
+// skipping the workflow chain. Mirrors createInitialTask: notifies the
+// assignee, logs the activity, and runs task_created automations.
+export async function createDirectAssignedTask(params: {
+  requestId: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string | null;
+  notes?: string;
+  departmentId: string;
+  assigneeId: string;
+  createdBy: string;
+}) {
+  const level = await getAssigneeLevelOrThrow(params.assigneeId);
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      request_id: params.requestId,
+      title: params.title,
+      description: params.description ?? null,
+      priority: params.priority,
+      due_date: params.dueDate ?? null,
+      notes: params.notes ?? null,
+      level,
+      status: "NotStarted" as TaskStatus,
+      department_id: params.departmentId,
+      assignee_id: params.assigneeId,
+      assigned_by: params.createdBy,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  if (data) {
+    await notifyTaskAssigned(params.assigneeId, params.title, data.id);
+    await logTaskCreated(params.createdBy, data.id, params.title, data.level);
+    await logTaskAssigned(
+      params.createdBy,
+      data.id,
+      params.title,
+      params.assigneeId,
+      data.level
+    );
+
+    const taskData: TaskData = {
+      id: data.id,
+      title: data.title,
+      status: data.status,
+      priority: data.priority,
+      level: data.level,
+      department_id: data.department_id,
+      assignee_id: data.assignee_id,
+      request_id: data.request_id,
+    };
+    await runAutomations("task_created", taskData, params.createdBy);
+  }
+
+  return data;
 }
 
 // Department Head approves task
