@@ -47,14 +47,43 @@
 
 > **في حال خطأ:** أكثر سبب شائع أن المشروع غير فاضي تماماً. أنشئ مشروع جديد بدل تنظيف مشروع موجود.
 
-### ٣) أخذ مفاتيح الـ API
+### ٣) نشر الـ Edge Functions
+
+> **مهم:** ملف `bootstrap.sql` ينشئ المخطط فقط. الـ Edge Functions في `supabase/functions/` (مثل `create-user`) تُنشر بشكل منفصل، وبدونها بعض ميزات التطبيق ستفشل (مثلاً صفحة "إضافة مستخدم" ترجع `Failed to send a request to the Edge Function`).
+
+**الطريقة الأسهل — Supabase CLI:**
+
+```bash
+# نزّل CLI لو لم يكن موجوداً
+curl -fsSL https://github.com/supabase/cli/releases/download/v1.226.4/supabase_linux_amd64.tar.gz \
+  | tar -xz -C /usr/local/bin/
+
+# ولّد Personal Access Token من https://supabase.com/dashboard/account/tokens
+export SUPABASE_ACCESS_TOKEN="<your-pat>"
+
+# انشر كل الـ functions في المستودع للفرع الجديد
+for fn in supabase/functions/*/; do
+  name=$(basename "$fn")
+  supabase functions deploy "$name" \
+    --project-ref <project-ref> \
+    --no-verify-jwt
+done
+```
+
+> الإشارة `--no-verify-jwt` تتطابق مع `verify_jwt = false` في `supabase/config.toml`. الـ functions تتحقق من المصادقة يدوياً داخل كودها.
+
+تحقق من النشر من Supabase Dashboard للمشروع الجديد → **Edge Functions** → يجب أن تشوف كل الـ functions بحالة **ACTIVE**.
+
+> **لا تنسَ:** بعد ما تخلص النشر، احذف الـ Personal Access Token من https://supabase.com/dashboard/account/tokens (PAT يعطي صلاحية كاملة على كل مشاريعك).
+
+### ٤) أخذ مفاتيح الـ API
 
 1. من Supabase Dashboard، اضغط **Settings** → **API**.
 2. انسخ:
    - **Project URL** (يبدأ بـ `https://` وينتهي بـ `.supabase.co`).
    - **anon / public key** (المفتاح العام الآمن لاستخدامه في الواجهة).
 
-### ٤) ضبط متغيرات البيئة في الـ Deployment
+### ٥) ضبط متغيرات البيئة في الـ Deployment
 
 في إعدادات النشر (Vercel / Netlify / Cloudflare Pages / أي منصة)، أضف هذين المتغيرين:
 
@@ -65,7 +94,7 @@ VITE_BRANCH2_SUPABASE_PUBLISHABLE_KEY="<anon-key>"
 
 > **مهم:** كلا المتغيرين يجب أن يبدآ بـ `VITE_` لأن Vite لا يكشف غيرها للواجهة.
 
-### ٥) ربط الـ Subdomain
+### ٦) ربط الـ Subdomain
 
 في إعدادات الدومين على منصة النشر:
 
@@ -73,7 +102,7 @@ VITE_BRANCH2_SUPABASE_PUBLISHABLE_KEY="<anon-key>"
 2. تأكد من إضافة CNAME في DNS مزوّد الدومين يشير إلى الـ deployment.
 3. انتظر انتشار DNS (دقائق إلى ساعات).
 
-### ٦) التحقق
+### ٧) التحقق
 
 1. افتح `https://branch2.<your-domain>` في المتصفح.
 2. شاشة الدخول ستظهر بنفس الشكل لكن متصلة بقاعدة بيانات الفرع الجديدة.
@@ -182,6 +211,9 @@ const branchEnvMap = {
 
 **شاشة الدخول تظهر لكن لا أستطيع تسجيل أي حساب.**
 → تحقق من **Authentication → Providers** في Supabase Dashboard إن **Email** مفعّل.
+
+**خطأ `Failed to send a request to the Edge Function` عند إضافة مستخدم.**
+→ Edge Function `create-user` غير منشورة على مشروع الفرع. ارجع لخطوة "نشر الـ Edge Functions" في الأعلى وانشرها بـ `supabase functions deploy`.
 
 **التطبيق يفتح القاعدة الخاطئة في الفرع الجديد.**
 → افتح Console في المتصفح، تأكد من رسالة `[supabase]` أو افحص الـ Network tab وراقب الطلبات إلى أي subdomain من `*.supabase.co` تذهب. لو تذهب لقاعدة الفرع القديم، فإن متغيرات البيئة `VITE_BRANCH2_*` غير معبأة في الـ deployment.
