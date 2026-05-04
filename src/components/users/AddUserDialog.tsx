@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+import { getBranchFlags } from "@/lib/branch-flags";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -34,7 +35,7 @@ interface AddUserDialogProps {
   onSuccess: () => void;
 }
 
-const roleOptions: { value: AppRole; label: string }[] = [
+const ALL_ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "GeneralManager", label: "المدير العام" },
   { value: "ExecutiveManager", label: "المدير التنفيذي" },
   { value: "CustomerService", label: "خدمة المستفيدين" },
@@ -42,6 +43,13 @@ const roleOptions: { value: AppRole; label: string }[] = [
   { value: "DepartmentHead", label: "رئيس قسم" },
   { value: "Employee", label: "موظف" },
 ];
+
+function getRoleOptions(): { value: AppRole; label: string }[] {
+  const { fourTierWorkflow } = getBranchFlags();
+  return fourTierWorkflow
+    ? ALL_ROLE_OPTIONS.filter((opt) => opt.value !== "Supervisor")
+    : ALL_ROLE_OPTIONS;
+}
 
 export function AddUserDialog({ open, onClose, onSuccess }: AddUserDialogProps) {
   const [fullName, setFullName] = useState("");
@@ -53,6 +61,7 @@ export function AddUserDialog({ open, onClose, onSuccess }: AddUserDialogProps) 
   const [loading, setLoading] = useState(false);
   const [fetchingDepts, setFetchingDepts] = useState(false);
   const { toast } = useToast();
+  const roleOptions = getRoleOptions();
 
   useEffect(() => {
     if (open) {
