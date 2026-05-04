@@ -103,7 +103,10 @@ export function TaskStatusForm({
       }
     }
 
-    // Supervisor actions — مخفية تماماً في سلسلة الأربع طبقات.
+    // Supervisor actions — مخفية في سلسلة الأربع طبقات (لا توجد طبقة مشرف
+    // في هذه السلسلة)، باستثناء حالة واحدة: مهمة قديمة عالقة في
+    // PendingSupervisorReview قبل تفعيل الـ flag — يجب أن يبقى للمدير العام
+    // زر "اعتماد" يدفعها لـ PendingExecutiveReview كما هو معرّف في approveTask.
     if (!fourTierWorkflow && (role === "Supervisor" || isGeneralManager)) {
       if (currentStatus === "NotStarted" && currentLevel === "Supervisor") {
         options.push({ value: "AssignToDepartment", label: "تعيين لقسم" });
@@ -111,6 +114,15 @@ export function TaskStatusForm({
       if (currentStatus === "PendingSupervisorReview") {
         options.push({ value: "Approve", label: "اعتماد" });
       }
+    }
+    if (
+      fourTierWorkflow &&
+      isGeneralManager &&
+      currentStatus === "PendingSupervisorReview"
+    ) {
+      // مهمة قديمة عالقة قبل تفعيل سلسلة الأربع طبقات — اسمح للمدير العام
+      // بدفعها للأمام يدوياً بدل ما تُعلّق إلى الأبد.
+      options.push({ value: "Approve", label: "اعتماد" });
     }
 
     // Department Head actions
