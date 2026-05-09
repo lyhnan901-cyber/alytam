@@ -41,6 +41,7 @@ import EmployeeTasksReport from "@/pages/EmployeeTasksReport";
  import Permissions from "@/pages/Permissions";
 import Donations from "@/pages/Donations";
 import Inventory from "@/pages/Inventory";
+import DepartmentAccess from "@/pages/DepartmentAccess";
 
 const queryClient = new QueryClient();
 
@@ -174,6 +175,14 @@ const App = () => (
                    </ProtectedRoute>
                  }
                />
+              <Route
+                path="/department-access"
+                element={
+                  <ProtectedRoute allowedRoles={["GeneralManager"]}>
+                    <DepartmentAccess />
+                  </ProtectedRoute>
+                }
+              />
                <Route
                 path="/reports/employees"
                 element={

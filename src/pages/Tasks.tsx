@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { canRoleDirectAssign } from "@/lib/workflow";
 import { getBranchFlags } from "@/lib/branch-flags";
 import { TaskForm } from "@/components/forms/TaskForm";
 import { TaskAssignmentForm } from "@/components/forms/TaskAssignmentForm";
@@ -120,6 +121,7 @@ export default function Tasks() {
     role === "Supervisor" ||
     (fourTierWorkflow && role === "ExecutiveManager");
   const canAssignEmployee = isGeneralManager || role === "DepartmentHead";
+  const canDirectAssign = canRoleDirectAssign(role);
 
   const fetchData = async () => {
     setLoading(true);
@@ -449,13 +451,13 @@ export default function Tasks() {
                             تعيين للموظف
                           </DropdownMenuItem>
                         )}
-                        {isGeneralManager && (
+                        {canDirectAssign && (
                           <DropdownMenuItem
                             className="gap-2"
                             onClick={() => handleAssign(task, "direct")}
                           >
                             <User className="w-4 h-4" />
-                            تعيين مباشر (GM)
+                            تعيين مباشر
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>

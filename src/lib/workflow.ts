@@ -333,6 +333,26 @@ export const directAssignableRoles = [
 
 export type DirectAssignableRole = (typeof directAssignableRoles)[number];
 
+// Roles that are ALLOWED to issue a direct task assignment (i.e. bypass the
+// normal Exec → Supervisor → DeptHead → Employee chain). Currently the
+// General Manager and the Supervisor. The Supervisor is constrained at the
+// data layer to departments listed in `user_department_access` (see RLS).
+export const rolesThatCanDirectAssign = [
+  "GeneralManager",
+  "Supervisor",
+] as const;
+
+export type DirectAssignerRole = (typeof rolesThatCanDirectAssign)[number];
+
+export function canRoleDirectAssign(
+  role: string | null | undefined
+): role is DirectAssignerRole {
+  return (
+    role === "GeneralManager" ||
+    role === "Supervisor"
+  );
+}
+
 // Maps an assignee's role to the corresponding TaskLevel. Returns null if the
 // role is not part of the execution chain (GeneralManager / CustomerService).
 export function roleToTaskLevel(role: string | null | undefined): TaskLevel | null {
@@ -365,8 +385,10 @@ async function getAssigneeLevelOrThrow(assigneeId: string): Promise<TaskLevel> {
   return level;
 }
 
-// GeneralManager-only: directly assign an EXISTING task to any user in the
-// execution chain, bypassing Executive → Supervisor → DeptHead → Employee.
+// Direct-assign an EXISTING task to any user in the execution chain,
+// bypassing Executive → Supervisor → DeptHead → Employee. Allowed for
+// GeneralManager and Supervisor (see `canRoleDirectAssign`); the Supervisor
+// is further constrained to departments in `user_department_access` via RLS.
 // Reuses updateTaskStatus so history, notifications, and automations all fire.
 export async function directAssignTask(
   taskId: string,
@@ -387,9 +409,11 @@ export async function directAssignTask(
   );
 }
 
-// GeneralManager-only: create a NEW task that is already assigned directly,
-// skipping the workflow chain. Mirrors createInitialTask: notifies the
-// assignee, logs the activity, and runs task_created automations.
+// Create a NEW task that is already assigned directly, skipping the workflow
+// chain. Allowed for GeneralManager and Supervisor (see `canRoleDirectAssign`);
+// the Supervisor is constrained to departments in `user_department_access`
+// via RLS. Mirrors createInitialTask: notifies the assignee, logs the
+// activity, and runs task_created automations.
 export async function createDirectAssignedTask(params: {
   requestId: string;
   title: string;

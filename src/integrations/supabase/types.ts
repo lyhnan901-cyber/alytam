@@ -856,6 +856,35 @@ export type Database = {
           },
         ]
       }
+      user_department_access: {
+        Row: {
+          department_id: string
+          granted_at: string
+          granted_by: string
+          user_id: string
+        }
+        Insert: {
+          department_id: string
+          granted_at?: string
+          granted_by: string
+          user_id: string
+        }
+        Update: {
+          department_id?: string
+          granted_at?: string
+          granted_by?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_department_access_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -974,6 +1003,14 @@ export type Database = {
         Returns: boolean
       }
       is_general_manager: { Args: { _user_id: string }; Returns: boolean }
+      can_user_access_department: {
+        Args: { _user_id: string; _dept_id: string }
+        Returns: boolean
+      }
+      user_has_dept_restrictions: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

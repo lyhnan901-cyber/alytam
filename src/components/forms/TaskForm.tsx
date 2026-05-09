@@ -33,7 +33,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   createDirectAssignedTask,
   directAssignableRoles,
+  canRoleDirectAssign,
 } from "@/lib/workflow";
+import { useAllowedDepartments } from "@/hooks/useAllowedDepartments";
 
 const taskSchema = z
   .object({
@@ -91,9 +93,11 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
-  const { user, isGeneralManager } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
+  const { allowedDepartmentIds, isRestricted } = useAllowedDepartments();
   const isEditing = !!task;
+  const canDirectAssign = canRoleDirectAssign(role);
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -112,21 +116,27 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
   const directAssign = form.watch("direct_assign");
   const selectedDept = form.watch("department_id");
 
-  // Load departments when GM toggles direct-assign on a new task
+  // Load departments when a privileged user (GM or Supervisor) toggles
+  // direct-assign on a new task. For restricted users (Supervisor with a
+  // department whitelist) the list is filtered to only their allowed depts.
   useEffect(() => {
-    if (!isGeneralManager || isEditing || !directAssign) return;
+    if (!canDirectAssign || isEditing || !directAssign) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("departments")
         .select("id, name")
         .order("name");
-      if (!cancelled && data) setDepartments(data);
+      if (isRestricted && allowedDepartmentIds && allowedDepartmentIds.length > 0) {
+        query = query.in("id", allowedDepartmentIds);
+      }
+      const { data } = await query;
+      if (!cancelled) setDepartments(data ?? []);
     })();
     return () => {
       cancelled = true;
     };
-  }, [isGeneralManager, isEditing, directAssign]);
+  }, [canDirectAssign, isEditing, directAssign, isRestricted, allowedDepartmentIds]);
 
   // Load assignees when a department is picked. Only users whose role is in
   // the execution chain (Executive/Supervisor/DeptHead/Employee) are listed —
@@ -197,7 +207,7 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
         });
       } else if (
         values.direct_assign &&
-        isGeneralManager &&
+        canDirectAssign &&
         values.assignee_id &&
         values.department_id
       ) {
@@ -357,7 +367,7 @@ export function TaskForm({ open, onClose, onSuccess, requestId, task }: TaskForm
               )}
             />
 
-            {isGeneralManager && !isEditing && (
+            {canDirectAssign && !isEditing && (
               <div className="rounded-md border bg-muted/30 p-3 space-y-3">
                 <FormField
                   control={form.control}

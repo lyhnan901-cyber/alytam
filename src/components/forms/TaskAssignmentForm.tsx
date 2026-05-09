@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useAllowedDepartments } from "@/hooks/useAllowedDepartments";
 import {
   assignTaskToDepartment,
   assignTaskToEmployee,
@@ -79,6 +80,7 @@ export function TaskAssignmentForm({
   );
   const { user } = useAuth();
   const { toast } = useToast();
+  const { allowedDepartmentIds, isRestricted } = useAllowedDepartments();
 
   const form = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentSchema),
@@ -89,16 +91,22 @@ export function TaskAssignmentForm({
     },
   });
 
-  // Fetch departments
+  // Fetch departments. For users with a department whitelist (Supervisor),
+  // we filter to only the allowed departments so they cannot pick a
+  // restricted department in the dropdown.
   useEffect(() => {
     const fetchDepartments = async () => {
-      const { data } = await supabase.from("departments").select("id, name");
+      let query = supabase.from("departments").select("id, name");
+      if (isRestricted && allowedDepartmentIds && allowedDepartmentIds.length > 0) {
+        query = query.in("id", allowedDepartmentIds);
+      }
+      const { data } = await query;
       if (data) setDepartments(data);
     };
     if (assignmentType === "department" || assignmentType === "direct") {
       fetchDepartments();
     }
-  }, [assignmentType]);
+  }, [assignmentType, isRestricted, allowedDepartmentIds]);
 
   // Fetch users based on assignment type
   useEffect(() => {
