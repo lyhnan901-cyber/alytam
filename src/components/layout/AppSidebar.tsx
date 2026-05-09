@@ -62,6 +62,7 @@ const MENU_GROUPS = [
       { icon: Megaphone,       label: "التعميمات",         path: "/announcements", roles: ["GeneralManager"] },
       { icon: Shield,          label: "الصلاحيات",         path: "/roles",         roles: ["GeneralManager"] },
       { icon: KeyRound,        label: "إدارة الأذونات",   path: "/permissions",   roles: ["GeneralManager"] },
+      { icon: Building2,       label: "وصول الأقسام",    path: "/department-access", roles: ["GeneralManager"] },
       { icon: Settings,        label: "الإعدادات",         path: "/settings",      roles: null },
     ],
   },

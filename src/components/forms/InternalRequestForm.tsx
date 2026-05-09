@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAllowedDepartments } from "@/hooks/useAllowedDepartments";
 import { useToast } from "@/hooks/use-toast";
 import { createInitialTask, createInternalRequestTask } from "@/lib/workflow";
 import { logRequestCreated } from "@/lib/activity-logger";
@@ -149,6 +150,7 @@ export function InternalRequestForm({
   const [departments, setDepartments] = useState<Department[]>([]);
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const { allowedDepartmentIds, isRestricted } = useAllowedDepartments();
 
   const form = useForm<InternalRequestFormValues>({
     resolver: zodResolver(internalRequestSchema),
@@ -168,14 +170,18 @@ export function InternalRequestForm({
 
   useEffect(() => {
     const fetchDepartments = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("departments")
         .select("id, name")
         .order("name");
+      if (isRestricted && allowedDepartmentIds && allowedDepartmentIds.length > 0) {
+        query = query.in("id", allowedDepartmentIds);
+      }
+      const { data, error } = await query;
       if (!error && data) setDepartments(data);
     };
     if (open) fetchDepartments();
-  }, [open]);
+  }, [open, isRestricted, allowedDepartmentIds]);
 
   const handleTaskTypeToggle = (taskType: string, checked: boolean) => {
     const current = form.getValues("task_types");
